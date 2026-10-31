@@ -17,6 +17,7 @@ class Lexer(private val source: String) {
     /** 关键字映射表（已更新） */
     private val keywords = mapOf(
         "var"       to TokenType.VAR,          // 变量声明
+        "const"       to TokenType.CONST,
         "func"      to TokenType.FUNC,         // 函数定义
         "namespace" to TokenType.NAMESPACE,    // 命名空间
         "if"        to TokenType.IF,

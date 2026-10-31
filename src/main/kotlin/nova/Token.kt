@@ -13,7 +13,8 @@ enum class TokenType {
     NUMBER, STRING, IDENT,
 
     // ---------- 关键字 ----------
-    VAR,          // var        变量声明（原 let）
+    VAR,       // var        变量声明（原 let）
+    CONST,
     FUNC,         // func       函数定义（原 fn）
     NAMESPACE,    // namespace  命名空间声明（新增）
     IF, ELSE, WHILE, FOR,

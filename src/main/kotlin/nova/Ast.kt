@@ -43,7 +43,11 @@ sealed class Stmt {
     data class Expression(val expr: Expr) : Stmt()
 
     /** var name = init; */
-    data class New(val name: String, val initializer: Expr) : Stmt()
+    data class Var(
+        val name: String,
+        val initializer: Expr,
+        val isConst: Boolean = false   // ← 新增
+    ) : Stmt()
 
     data class If(
         val condition: Expr,
@@ -93,7 +97,8 @@ sealed class Stmt {
     data class ClassField(
         val isPublic: Boolean,
         val name: String,
-        val initializer: Expr
+        val initializer: Expr,
+        val isConst: Boolean = false
     )
 
     /** class Name { ... } */
@@ -111,4 +116,11 @@ sealed class Stmt {
         val params: List<String>,
         val body: List<Stmt>
     )
+
+    data class ForEachIndex(
+        val varName: String,
+        val collectionExpr: Expr,     // 含 $ 的表达式
+        val sizeExpr: Expr?,          // ← 新增：可选“显式长度”
+        val body: List<Stmt>
+    ) : Stmt()
 }

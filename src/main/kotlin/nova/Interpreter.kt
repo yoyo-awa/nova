@@ -66,7 +66,7 @@ class Interpreter (private val args: List<String> = emptyList()) {
             is Stmt.Expression -> evaluate(stmt.expr, env)
 
             // var name = init;
-            is Stmt.New -> env.define(stmt.name, evaluate(stmt.initializer, env))
+            is Stmt.Var -> env.define(stmt.name, evaluate(stmt.initializer, env), stmt.isConst)
 
 
             is Stmt.Block -> executeBlock(stmt.statements, Environment(env))
@@ -109,6 +109,58 @@ class Interpreter (private val args: List<String> = emptyList()) {
                     }
                 } catch (e: BreakSignal) {
                     // break：跳出整个 for
+                }
+            }
+
+            is Stmt.ForEachIndex -> {
+                val loopEnv = Environment(env)
+
+                if (stmt.sizeExpr != null) {
+                    // 显式长度
+                    val size = evaluate(stmt.sizeExpr, env) as? Int
+                        ?: throw NovaRuntimeError("for: size must be an integer")
+
+                    for (index in 0 until size) {
+                        loopEnv.define("$", index)
+                        val value = evaluate(stmt.collectionExpr, loopEnv)
+
+                        val iterEnv = Environment(loopEnv)
+                        iterEnv.define(stmt.varName, value)
+                        try {
+                            executeBlock(stmt.body, iterEnv)
+                        } catch (e: BreakSignal) {
+                            break
+                        } catch (e: ContinueSignal) {
+                            continue
+                        }
+                    }
+                } else {
+                    // 自动长度：越界 / null 停
+                    var index = 0
+                    while (true) {
+                        loopEnv.define("$", index)
+
+                        val value = try {
+                            evaluate(stmt.collectionExpr, loopEnv)
+                        } catch (e: NovaRuntimeError) {
+                            break
+                        }
+
+                        if (value == null) break
+
+                        val iterEnv = Environment(loopEnv)
+                        iterEnv.define(stmt.varName, value)
+                        try {
+                            executeBlock(stmt.body, iterEnv)
+                        } catch (e: BreakSignal) {
+                            break
+                        } catch (e: ContinueSignal) {
+                            index += 1
+                            continue
+                        }
+
+                        index += 1
+                    }
                 }
             }
 
@@ -170,7 +222,7 @@ class Interpreter (private val args: List<String> = emptyList()) {
                 // 3. 逐个执行 body 中的声明，把它们登记到 nsEnv
                 for (s in stmt.body) {
                     when (s) {
-                        is Stmt.New -> nsEnv.define(s.name, evaluate(s.initializer, nsEnv))
+                        is Stmt.Var -> nsEnv.define(s.name, evaluate(s.initializer, nsEnv))
                         is Stmt.FuncDecl -> {
                             // 函数在创建时，闭包捕获的是 nsEnv，
                             // 这样函数体内部能直接访问同命名空间的其它成员。
@@ -226,7 +278,7 @@ class Interpreter (private val args: List<String> = emptyList()) {
         val nsEnv = Environment(parentEnv)
         for (s in decl.body) {
             when (s) {
-                is Stmt.New -> nsEnv.define(s.name, evaluate(s.initializer, nsEnv))
+                is Stmt.Var -> nsEnv.define(s.name, evaluate(s.initializer, nsEnv))
                 is Stmt.FuncDecl -> {
                     val fn = NovaFunction(s.params, s.body, nsEnv, s.name)
                     nsEnv.define(s.name, fn)

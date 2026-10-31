@@ -27,6 +27,7 @@ class Parser(private val tokens: List<Token>) {
         if (match(TokenType.CLASS))   return classDeclaration()
         if (match(TokenType.FUNC))      return funcDeclaration()
         if (match(TokenType.VAR))       return varDeclaration()
+        if (match(TokenType.CONST))     return constVarDeclaration()
         if (match(TokenType.NAMESPACE)) return namespaceDeclaration()
         return statement()
     }
@@ -54,12 +55,21 @@ class Parser(private val tokens: List<Token>) {
             if (match(TokenType.PUBLIC)) isPublic = true
             else if (match(TokenType.PRIVATE)) isPublic = false
 
+
             if (match(TokenType.VAR)) {
                 val fieldName = consume(TokenType.IDENT, "Expect field name").lexeme
                 consume(TokenType.ASSIGN, "Expect '=' after field name")
                 val init = expression()
                 consume(TokenType.SEMICOLON, "Expect ';' after field")
                 fields.add(Stmt.ClassField(isPublic, fieldName, init))
+            } else if (match(TokenType.CONST)) {
+                // 类体里的常量字段
+                consume(TokenType.VAR, "Expect 'var' after 'const'")
+                val fieldName = consume(TokenType.IDENT, "Expect field name").lexeme
+                consume(TokenType.ASSIGN, "Expect '=' after field name")
+                val init = expression()
+                consume(TokenType.SEMICOLON, "Expect ';' after field")
+                fields.add(Stmt.ClassField(isPublic, fieldName, init, true))
             } else if (match(TokenType.FUNC)) {
                 val methodName = consume(TokenType.IDENT, "Expect method name").lexeme
                 consume(TokenType.LPAREN, "Expect '(' after method name")
@@ -102,7 +112,16 @@ class Parser(private val tokens: List<Token>) {
         consume(TokenType.ASSIGN, "Expect '=' after variable name")
         val init = expression()
         consume(TokenType.SEMICOLON, "Expect ';' after declaration")
-        return Stmt.New(name, init)
+        return Stmt.Var(name, init)
+    }
+
+    private fun constVarDeclaration(): Stmt {
+        consume(TokenType.VAR, "Expect 'var' after 'const'")
+        val name = consume(TokenType.IDENT, "Expect variable name").lexeme
+        consume(TokenType.ASSIGN, "Expect '=' after variable name")
+        val init = expression()
+        consume(TokenType.SEMICOLON, "Expect ';' after declaration")
+        return Stmt.Var(name, init, isConst = true)
     }
 
     /** namespace Name { ... } —— 把 body 作为普通语句块解析 */
@@ -152,17 +171,29 @@ class Parser(private val tokens: List<Token>) {
     }
 
     private fun forStatement(): Stmt {
+        if (check(TokenType.IDENT) && checkNext(TokenType.ASSIGN)) {
+            val varName = consume(TokenType.IDENT, "Expect variable name").lexeme
+            consume(TokenType.ASSIGN, "Expect '=' after variable")
+            val collection = expression()
+
+            var sizeExpr: Expr? = null
+            if (match(TokenType.COMMA)) {
+                sizeExpr = expression()
+            }
+
+            return Stmt.ForEachIndex(varName, collection, sizeExpr, block())
+        }
+        // 旧语法：for ( ... )
         consume(TokenType.LPAREN, "Expect '(' after 'for'")
         val init = if (match(TokenType.SEMICOLON)) null
-                   else if (match(TokenType.VAR)) varDeclaration()
-                   else expressionStatement()
+        else if (match(TokenType.VAR)) varDeclaration()
+        else expressionStatement()
         val cond = if (!check(TokenType.SEMICOLON)) expression() else null
         consume(TokenType.SEMICOLON, "Expect ';' after loop condition")
         val update = if (!check(TokenType.RPAREN)) expression() else null
         consume(TokenType.RPAREN, "Expect ')' after for clauses")
         return Stmt.For(init, cond, update, block())
     }
-
     private fun returnStatement(): Stmt {
         val value = if (!check(TokenType.SEMICOLON)) expression() else null
         consume(TokenType.SEMICOLON, "Expect ';' after return value")
@@ -404,6 +435,16 @@ class Parser(private val tokens: List<Token>) {
         return false
     }
     private fun check(type: TokenType) = !isAtEnd() && peek().type == type
+    private fun checkNext(type: TokenType): Boolean {
+        if (pos + 1 >= tokens.size) return false
+        return tokens[pos + 1].type == type
+    }
+
+    /** 检查“下下个” token 是 type（不前进） */
+    private fun checkNextNext(type: TokenType): Boolean {
+        if (pos + 2 >= tokens.size) return false
+        return tokens[pos + 2].type == type
+    }
     private fun advance(): Token = tokens[pos++]
     private fun isAtEnd() = peek().type == TokenType.EOF
     private fun peek() = tokens[pos]
