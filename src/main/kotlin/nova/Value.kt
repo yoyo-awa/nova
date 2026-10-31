@@ -228,11 +228,24 @@ class NovaMap : MutableMap<Any?, Any?> by mutableMapOf() {
  */
 class NovaClass(
     val name: String,
+    val parent: String?,          // ← 新增
     val fields: List<Stmt.ClassField>,
     val methods: Map<String, ClassMethodInfo>,
     val closure: Environment
 ) {
+    var parentClass: NovaClass? = null     // ← 运行时"父类引用"
+
     override fun toString() = "<class $name>"
+}
+
+/**
+ * super 的运行时引用——"从父类找成员"。
+ */
+class SuperRef(
+    val instance: NovaInstance,
+    val currentClass: NovaClass,
+) {
+    override fun toString() = "<super>"
 }
 
 /**
@@ -254,7 +267,11 @@ class NovaInstance(val klass: NovaClass) {
 /**
  * 绑定到实例的方法。
  */
-class BoundMethod(val instance: NovaInstance, val fn: NovaFunction) {
+class BoundMethod(
+    val instance: NovaInstance,
+    val fn: NovaFunction,
+    val definingClass: NovaClass      // ← 新增：方法定义在哪个类
+) {
     override fun toString() = "<bound method ${fn.name}>"
 }
 

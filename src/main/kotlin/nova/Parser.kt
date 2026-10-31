@@ -33,31 +33,34 @@ class Parser(private val tokens: List<Token>) {
 
 
     private fun classDeclaration(): Stmt {
-        val name = consume(TokenType.IDENT, "Expect class name").lexeme
+        val firstName = consume(TokenType.IDENT, "Expect class name").lexeme
+
+        // 检查是否是 "Parent -> Child"
+        var name = firstName
+        var parent: String? = null
+        if (match(TokenType.SINGLE_ARROW)) {
+            // firstName 是父类，下一个是子类
+            parent = firstName
+            name = consume(TokenType.IDENT, "Expect child class name").lexeme
+        }
+
         consume(TokenType.LBRACE, "Expect '{' after class name")
 
         val fields = mutableListOf<Stmt.ClassField>()
         val methods = mutableListOf<Stmt.ClassMethod>()
 
         while (!check(TokenType.RBRACE) && !isAtEnd()) {
-            // 解析修饰符（默认 private）
             var isPublic = false
-            if (match(TokenType.PUBLIC)) {
-                isPublic = true
-            } else if (match(TokenType.PRIVATE)) {
-                isPublic = false
-            }
-            // 没写修饰符 → 默认 private
+            if (match(TokenType.PUBLIC)) isPublic = true
+            else if (match(TokenType.PRIVATE)) isPublic = false
 
             if (match(TokenType.VAR)) {
-                // 字段：var name = init;
                 val fieldName = consume(TokenType.IDENT, "Expect field name").lexeme
                 consume(TokenType.ASSIGN, "Expect '=' after field name")
                 val init = expression()
                 consume(TokenType.SEMICOLON, "Expect ';' after field")
                 fields.add(Stmt.ClassField(isPublic, fieldName, init))
             } else if (match(TokenType.FUNC)) {
-                // 方法：func name(...) { ... }
                 val methodName = consume(TokenType.IDENT, "Expect method name").lexeme
                 consume(TokenType.LPAREN, "Expect '(' after method name")
                 val params = mutableListOf<String>()
@@ -75,7 +78,7 @@ class Parser(private val tokens: List<Token>) {
         }
 
         consume(TokenType.RBRACE, "Expect '}' after class body")
-        return Stmt.ClassDecl(name, fields, methods)
+        return Stmt.ClassDecl(name, parent, fields, methods)
     }
 
     /** func name(params) { body } */
@@ -357,6 +360,7 @@ class Parser(private val tokens: List<Token>) {
         if (match(TokenType.STRING)) return Expr.Literal(previous().literal)
         if (match(TokenType.IDENT))  return Expr.Variable(previous().lexeme)
         if (match(TokenType.THIS))   return Expr.This()
+        if (match(TokenType.SUPER)) return Expr.Super()
 
         if (match(TokenType.LPAREN)) {
             val first = expression()

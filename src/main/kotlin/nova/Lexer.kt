@@ -38,6 +38,7 @@ class Lexer(private val source: String) {
         "class"    to TokenType.CLASS,
         "private"    to TokenType.PRIVATE,
         "this"    to TokenType.THIS,
+        "super" to TokenType.SUPER,
     )
 
     fun tokenize(): List<Token> {
@@ -136,6 +137,8 @@ class Lexer(private val source: String) {
             "&&" -> { add(TokenType.AND, two); return }
             "||" -> { add(TokenType.OR, two); return }
             "|>" -> { add(TokenType.PIPE, two); return }
+            "->" -> { add(TokenType.SINGLE_ARROW, two); return }
+            "=>" -> { add(TokenType.DOUBLE_ARROW, two); return }
         }
         when (c) {
             '+' -> add(TokenType.PLUS, "+")

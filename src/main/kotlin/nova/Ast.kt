@@ -28,6 +28,8 @@ sealed class Expr {
     data class Pipe(val left: Expr, val right: Expr) : Expr()
     data class Dollar(val dummy: Unit = Unit) : Expr()
     data class This(val dummy: Unit = Unit) : Expr()
+    /** super */
+    data class Super(val dummy: Unit = Unit) : Expr()
 }
 
 /**
@@ -97,6 +99,7 @@ sealed class Stmt {
     /** class Name { ... } */
     data class ClassDecl(
         val name: String,
+        val parent: String?,
         val fields: List<ClassField>,
         val methods: List<ClassMethod>
     ) : Stmt()

@@ -136,7 +136,17 @@ class Interpreter (private val args: List<String> = emptyList()) {
                     val fn = NovaFunction(m.params, m.body, env, m.name)
                     methods[m.name] = ClassMethodInfo(m.isPublic, fn)
                 }
-                val klass = NovaClass(stmt.name, stmt.fields, methods, env)
+                val klass = NovaClass(stmt.name, stmt.parent, stmt.fields, methods, env)
+
+                // 解析父类
+                if (stmt.parent != null) {
+                    val parentClass = env.get(stmt.parent)
+                    if (parentClass !is NovaClass) {
+                        throw NovaRuntimeError("Parent '${stmt.parent}' is not a class")
+                    }
+                    klass.parentClass = parentClass
+                }
+
                 env.define(stmt.name, klass)
             }
 
@@ -294,6 +304,14 @@ class Interpreter (private val args: List<String> = emptyList()) {
                 v
             }
 
+            is Expr.Super -> {
+                val thisInstance = env.getOrNull("this") as? NovaInstance
+                    ?: throw NovaRuntimeError("'super' can only be used in a method")
+                val currentClass = env.getOrNull("currentClass") as? NovaClass
+                    ?: throw NovaRuntimeError("'super' can only be used in a method")
+                SuperRef(thisInstance, currentClass)
+            }
+
             is Expr.ArrayLit -> expr.elements.map { evaluate(it, env) }.toMutableList()
 
             is Expr.This -> env.get("this")
@@ -320,13 +338,11 @@ class Interpreter (private val args: List<String> = emptyList()) {
                     }
 
                     is NovaInstance -> {
-                        // 先查字段
-                        val fieldDef = target.klass.fields.find { it.name == expr.name }
+                        // 先查字段（沿继承链）
+                        val fieldDef = findFieldInChain(target.klass, expr.name)
                         if (fieldDef != null) {
-                            // 字段存在 —— 检查权限
                             if (!fieldDef.isPublic) {
-                                // 只有 "this" 访问时允许（用 env 里有没有 this，且 this 是不是这个实例来判断）
-                                val currentThis = env.getOrNull("this")   // ← 加 getOrNull
+                                val currentThis = env.getOrNull("this")
                                 if (currentThis !== target) {
                                     throw NovaRuntimeError(
                                         "Field '${expr.name}' is private in class '${target.klass.name}'")
@@ -334,8 +350,9 @@ class Interpreter (private val args: List<String> = emptyList()) {
                             }
                             return target.fields[expr.name]
                         }
-                        // 再查方法
-                        val method = target.klass.methods[expr.name]
+
+                        // 再查方法（沿继承链）
+                        val method = findMethodInChain(target.klass, expr.name)
                         if (method != null) {
                             if (!method.isPublic) {
                                 val currentThis = env.getOrNull("this")
@@ -344,7 +361,7 @@ class Interpreter (private val args: List<String> = emptyList()) {
                                         "Method '${expr.name}' is private in class '${target.klass.name}'")
                                 }
                             }
-                            return BoundMethod(target, method.fn)
+                            return BoundMethod(target, method.fn, findDefiningClass(target.klass, expr.name))
                         }
                         throw NovaRuntimeError(
                             "Instance of '${target.klass.name}' has no member '${expr.name}'")
@@ -377,6 +394,17 @@ class Interpreter (private val args: List<String> = emptyList()) {
                         "path" -> target.path.toString()
                         "mode" -> target.mode
                         else -> throw NovaRuntimeError("File has no member '${expr.name}'")
+                    }
+
+                    is SuperRef -> {
+                        val parentClass = target.currentClass.parentClass     // ← 用 currentClass
+                            ?: throw NovaRuntimeError("Class has no parent")
+                        val method = findMethodInChain(parentClass, expr.name)
+                        if (method != null) {
+                            return BoundMethod(target.instance, method.fn, parentClass)
+                        }
+                        throw NovaRuntimeError(
+                            "Parent class '${parentClass.name}' has no member '${expr.name}'")
                     }
 
                     is NovaWindow -> when (expr.name) {
@@ -463,11 +491,9 @@ class Interpreter (private val args: List<String> = emptyList()) {
                         v
                     }
                     is NovaInstance -> {
-                        val fieldDef = target.klass.fields.find { it.name == expr.name }
-                        if (fieldDef == null) {
-                            throw NovaRuntimeError(
-                                "Instance of '${target.klass.name}' has no field '${expr.name}'")
-                        }
+                        val fieldDef = findFieldInChain(target.klass, expr.name) ?: throw NovaRuntimeError(
+                            "Instance of '${target.klass.name}' has no field '${expr.name}'"
+                        )
                         if (!fieldDef.isPublic) {
                             val currentThis = env.getOrNull("this")
                             if (currentThis !== target) {
@@ -736,6 +762,46 @@ class Interpreter (private val args: List<String> = emptyList()) {
         else -> true
     }
 
+    private fun initClassHierarchy(instance: NovaInstance, klass: NovaClass) {
+        // 先初始化父类
+        klass.parentClass?.let { initClassHierarchy(instance, it) }
+
+        // 再初始化"当前类"的字段
+        for (field in klass.fields) {
+            val fieldEnv = Environment(klass.closure)
+            fieldEnv.define("this", instance)
+            instance.fields[field.name] = evaluate(field.initializer, fieldEnv)
+        }
+    }
+
+    private fun findMethodInChain(klass: NovaClass?, name: String): ClassMethodInfo? {
+        var k = klass
+        while (k != null) {
+            if (k.methods.containsKey(name)) return k.methods[name]
+            k = k.parentClass
+        }
+        return null
+    }
+
+    private fun findFieldInChain(klass: NovaClass?, name: String): Stmt.ClassField? {
+        var k = klass
+        while (k != null) {
+            val f = k.fields.find { it.name == name }
+            if (f != null) return f
+            k = k.parentClass
+        }
+        return null
+    }
+
+    private fun findDefiningClass(klass: NovaClass?, name: String): NovaClass {
+        var k = klass
+        while (k != null) {
+            if (k.methods.containsKey(name)) return k
+            k = k.parentClass
+        }
+        throw NovaRuntimeError("Method '$name' not found")
+    }
+
     private fun callFunctionValue(callee: Any?, args: List<Any?>, env: Environment): Any? {
         return when (callee) {
             is NovaFunction -> {
@@ -754,6 +820,7 @@ class Interpreter (private val args: List<String> = emptyList()) {
                 val fn = callee.fn
                 val fnEnv = Environment(fn.closure)
                 fnEnv.define("this", callee.instance)
+                fnEnv.define("currentClass", callee.definingClass)
                 if (args.size != fn.params.size)
                     throw NovaRuntimeError("Expected ${fn.params.size} args, got ${args.size}")
                 for ((p, a) in fn.params.zip(args)) fnEnv.define(p, a)
@@ -766,30 +833,47 @@ class Interpreter (private val args: List<String> = emptyList()) {
             }
             is NovaClass -> {
                 val instance = NovaInstance(callee)
-                // 初始化字段
-                for (field in callee.fields) {
-                    val fieldEnv = Environment(callee.closure)
-                    fieldEnv.define("this", instance)
-                    instance.fields[field.name] = evaluate(field.initializer, fieldEnv)
-                }
-                // 调构造
-                val ctor = callee.methods[callee.name]
+
+                // 1. 先初始化"父类"（递归）
+                initClassHierarchy(instance, callee)
+
+                // 2. 调"当前类"的构造
+                val ctor = findMethodInChain(callee, callee.name)
                 if (ctor != null) {
                     val initEnv = Environment(ctor.fn.closure)
                     initEnv.define("this", instance)
+                    initEnv.define("currentClass", callee)
                     if (args.size != ctor.fn.params.size)
-                        throw NovaRuntimeError(
-                            "Constructor expects ${ctor.fn.params.size} args, got ${args.size}")
+                        throw NovaRuntimeError("Constructor expects ${ctor.fn.params.size} args, got ${args.size}")
                     for ((p, a) in ctor.fn.params.zip(args)) initEnv.define(p, a)
                     try {
                         for (s in ctor.fn.body) execute(s, initEnv)
-                    } catch (e: ReturnSignal) {
-                        // 构造不返回
-                    }
+                    } catch (e: ReturnSignal) { }
                 } else if (args.isNotEmpty()) {
                     throw NovaRuntimeError("Class ${callee.name} has no constructor")
                 }
+
                 instance
+            }
+            is SuperRef -> {
+                val parentClass = callee.currentClass.parentClass     // ← 改这里
+                    ?: throw NovaRuntimeError("Class has no parent")
+                val parentCtor = findMethodInChain(parentClass, parentClass.name)
+                if (parentCtor != null) {
+                    val initEnv = Environment(parentCtor.fn.closure)
+                    initEnv.define("this", callee.instance)
+                    initEnv.define("currentClass", parentClass)        // ← 父类构造的"当前类"是父类
+                    if (args.size != parentCtor.fn.params.size)
+                        throw NovaRuntimeError(
+                            "Parent constructor expects ${parentCtor.fn.params.size} args, got ${args.size}")
+                    for ((p, a) in parentCtor.fn.params.zip(args)) initEnv.define(p, a)
+                    try {
+                        for (s in parentCtor.fn.body) execute(s, initEnv)
+                    } catch (e: ReturnSignal) { }
+                } else if (args.isNotEmpty()) {
+                    throw NovaRuntimeError("Parent class has no constructor")
+                }
+                null
             }
             is BuiltinFunction -> callee.fn(args)
             is BoundBuiltinMethod -> callee.fn()

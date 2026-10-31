@@ -43,7 +43,7 @@ object StdLib {
         val console = globals.get("Console") as NovaNamespace
         val out = console.get("Out") as NovaNamespace
         globals.define("println", out.get("println"))
-
+        globals.define("print", out.get("print"))
     }
 
     // ============================================================
@@ -215,7 +215,18 @@ object StdLib {
             if (len !in 0..10000) {
                 throw NovaRuntimeError("Math.Random.string: length must be 0..10000")
             }
-            val chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
+            // 可选字符集
+            val chars = if (args.size >= 2) {
+                requireString(args, 1, "string")
+            } else {
+                "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+            }
+
+            if (chars.isEmpty()) {
+                throw NovaRuntimeError("Math.Random.string: charset cannot be empty")
+            }
+
             val sb = StringBuilder()
             for (i in 0 until len) {
                 sb.append(chars[KRandom.nextInt(chars.length)])

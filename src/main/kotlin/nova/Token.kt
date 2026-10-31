@@ -24,7 +24,8 @@ enum class TokenType {
     // ---------- 运算符 ----------
     PLUS, MINUS, STAR, SLASH, PERCENT,
     EQ, NEQ, LT, GT, LTE, GTE, ASSIGN,
-    DOT,          // .          成员访问（新增）
+    DOT,
+    SINGLE_ARROW, DOUBLE_ARROW,// .          成员访问（新增）
 
     // ---------- 分隔符 ----------
     LPAREN, RPAREN, LBRACE, RBRACE,
@@ -36,7 +37,8 @@ enum class TokenType {
     BREAK, CONTINUE, RETURN, TRY, CATCH,
 
     // ---------- 特殊 ----------
-    EOF
+    EOF,
+    SUPER
 }
 
 data class Token(
