@@ -284,6 +284,13 @@ object StdLib {
             val p = requireString(args, 1, "end")
             s.endsWith(p)
         })
+        str.define("split", BuiltinFunction("split") { args ->
+            val s = requireString(args, 0, "split")
+            val sep = requireString(args, 1, "split")
+            if (sep.isEmpty())
+                throw NovaRuntimeError("String.split: separator cannot be empty")
+            s.split(sep).toMutableList()
+        })
         str.define("slice", BuiltinFunction("slice") { args ->
             val s = requireString(args, 0, "slice")
             val a = requireInt(args, 1, "slice")

@@ -358,3 +358,14 @@ class BoundBuiltinMethodWithArgs(
 ) {
     override fun toString() = "<bound builtin $name>"
 }
+
+/**
+ * 绑定到“接收者”的方法——value.func 返回这个。
+ * 调用时把 receiver 作为 func 的第一个参数。
+ */
+class BoundReceiverMethod(
+    val receiver: Any?,
+    val name: String
+) {
+    override fun toString() = "<bound ${name}>"
+}

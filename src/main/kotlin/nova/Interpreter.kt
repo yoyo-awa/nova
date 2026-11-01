@@ -526,8 +526,7 @@ class Interpreter (private val args: List<String> = emptyList()) {
                         }
                         else -> throw NovaRuntimeError("TextField has no member '${expr.name}'")
                     }
-
-                    else -> throw NovaRuntimeError("Cannot access member '${expr.name}'")
+                    else -> BoundReceiverMethod(target, expr.name)
                 }
             }
 
@@ -854,6 +853,18 @@ class Interpreter (private val args: List<String> = emptyList()) {
         throw NovaRuntimeError("Method '$name' not found")
     }
 
+    private fun findBuiltinForReceiver(receiver: Any?, name: String): BuiltinFunction? {
+        val nsName = when (receiver) {
+            is String -> "String"
+            is MutableList<*> -> "Array"
+            is NovaMap -> "Map"
+            else -> return null
+        }
+
+        val ns = globals.getOrNull(nsName) as? NovaNamespace ?: return null
+        return if (ns.has(name)) ns.get(name) as? BuiltinFunction else null
+    }
+
     private fun callFunctionValue(callee: Any?, args: List<Any?>, env: Environment): Any? {
         return when (callee) {
             is NovaFunction -> {
@@ -930,6 +941,18 @@ class Interpreter (private val args: List<String> = emptyList()) {
             is BuiltinFunction -> callee.fn(args)
             is BoundBuiltinMethod -> callee.fn()
             is BoundBuiltinMethodWithArgs -> callee.fn(args)
+            is BoundReceiverMethod -> {
+                // 从全局命名空间里找 func
+                // 比如 String.upper / Array.push / Map.has
+                val builtin = findBuiltinForReceiver(callee.receiver, callee.name)
+                    ?: throw NovaRuntimeError(
+                        "No method '${callee.name}' for ${stringify(callee.receiver)}")
+
+                // 把 receiver 作为第一个参数
+                val allArgs = mutableListOf(callee.receiver)
+                allArgs.addAll(args)
+                builtin.fn(allArgs)
+            }
             else -> throw NovaRuntimeError("Can only call functions or classes")
         }
     }
