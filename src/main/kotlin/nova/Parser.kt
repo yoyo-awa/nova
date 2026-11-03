@@ -147,6 +147,7 @@ class Parser(private val tokens: List<Token>) {
             match(TokenType.BREAK)  -> breakStatement()
             match(TokenType.CONTINUE) -> continueStatement()
             match(TokenType.TRY)      -> tryCatchStatement()
+            match(TokenType.PROPERTY) -> propertyStatement()
             else -> expressionStatement()
         }
     }
@@ -241,6 +242,24 @@ class Parser(private val tokens: List<Token>) {
 
         return Stmt.TryCatch(tryBlock, catchVar, catchBlock)
     }
+
+    private fun propertyStatement(): Stmt {
+        var isConst = false
+        if (match(TokenType.CONST)) {
+            isConst = true
+            consume(TokenType.VAR, "Expect 'var' after 'const'")
+        } else {
+            consume(TokenType.VAR, "Expect 'var' after 'property'")
+        }
+
+        val name = consume(TokenType.IDENT, "Expect property name").lexeme
+        consume(TokenType.ASSIGN, "Expect '=' after property name")
+        val init = expression()
+        consume(TokenType.SEMICOLON, "Expect ';' after property")
+
+        return Stmt.Property(name, init, isConst)
+    }
+
 
     // ============================================================
     //                    表达式（按优先级分层）

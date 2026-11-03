@@ -163,6 +163,8 @@ class NovaFunction(
     val closure: Environment,
     val name: String = "<anonymous>"
 ) {
+    val fields = mutableMapOf<String, Any?>()
+    val constFields = mutableSetOf<String>()
     override fun toString() = "<fn $name>"
 }
 

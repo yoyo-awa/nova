@@ -123,4 +123,10 @@ sealed class Stmt {
         val sizeExpr: Expr?,          // ← 新增：可选“显式长度”
         val body: List<Stmt>
     ) : Stmt()
+
+    data class Property(
+        val name: String,
+        val initializer: Expr,
+        val isConst: Boolean = false
+    ) : Stmt()
 }

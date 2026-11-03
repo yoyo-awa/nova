@@ -16,16 +16,20 @@ import kotlin.system.exitProcess
  * Without args: print usage and exit.
  */
 fun main(args: Array<String>) {
-    // 1. No args: print usage
+    // 先检查 --version
+    if (args.contains("--version") || args.contains("-v")) {
+        val version = readVersionFromResources()
+        println("Nova $version")
+        return
+    }
+
     if (args.isEmpty()) {
         System.err.println("Usage: nova <file.nv> [args...]")
         exitProcess(1)
     }
 
-    // 2. First arg is file path, rest are passed to Nova
     val file = args[0]
     val extraArgs = args.drop(1)
-
     runFile(file, extraArgs)
 }
 
@@ -66,4 +70,9 @@ private fun runFile(path: String, extraArgs: List<String>) {
         System.err.println("Runtime error: ${e.message}")
         exitProcess(1)
     }
+}
+
+private fun readVersionFromResources(): String {
+    val stream = object {}.javaClass.getResourceAsStream("/version")
+    return stream?.bufferedReader()?.readText()?.trim() ?: "unknown"
 }

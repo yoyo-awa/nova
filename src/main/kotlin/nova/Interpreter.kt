@@ -112,6 +112,19 @@ class Interpreter (private val args: List<String> = emptyList()) {
                 }
             }
 
+            is Stmt.Property -> {
+                // 从当前环境拿到"当前函数对象"
+                val fn = env.getOrNull("__fn__") as? NovaFunction
+                    ?: throw NovaRuntimeError(
+                        "'property' can only be used inside a function")
+
+                fn.fields[stmt.name] = evaluate(stmt.initializer, env)
+
+                if (stmt.isConst) {
+                    fn.constFields.add(stmt.name)
+                }
+            }
+
             is Stmt.ForEachIndex -> {
                 val loopEnv = Environment(env)
 
@@ -419,6 +432,15 @@ class Interpreter (private val args: List<String> = emptyList()) {
                             "Instance of '${target.klass.name}' has no member '${expr.name}'")
                     }
 
+                    is NovaFunction -> {
+                        if (target.fields.containsKey(expr.name)) {
+                            target.fields[expr.name]
+                        } else {
+                            throw NovaRuntimeError(
+                                "Function '${target.name}' has no field '${expr.name}'")
+                        }
+                    }
+
                     is NovaFile -> when (expr.name) {
                         "read" -> BoundBuiltinMethod("read") {
                             target.readAll()
@@ -551,6 +573,14 @@ class Interpreter (private val args: List<String> = emptyList()) {
                                 throw NovaRuntimeError(
                                     "Field '${expr.name}' is private in class '${target.klass.name}'")
                             }
+                        }
+                        target.fields[expr.name] = v
+                        v
+                    }
+                    is NovaFunction -> {
+                        if (target.constFields.contains(expr.name)) {
+                            throw NovaRuntimeError(
+                                "Cannot assign to const property '${expr.name}' of function '${target.name}'")
                         }
                         target.fields[expr.name] = v
                         v
@@ -869,6 +899,7 @@ class Interpreter (private val args: List<String> = emptyList()) {
         return when (callee) {
             is NovaFunction -> {
                 val fnEnv = Environment(callee.closure)
+                fnEnv.define("__fn__", callee)
                 if (args.size != callee.params.size)
                     throw NovaRuntimeError("Expected ${callee.params.size} args, got ${args.size}")
                 for ((p, a) in callee.params.zip(args)) fnEnv.define(p, a)
@@ -883,6 +914,7 @@ class Interpreter (private val args: List<String> = emptyList()) {
                 val fn = callee.fn
                 val fnEnv = Environment(fn.closure)
                 fnEnv.define("this", callee.instance)
+                fnEnv.define("__fn__", callee.fn)
                 fnEnv.define("currentClass", callee.definingClass)
                 if (args.size != fn.params.size)
                     throw NovaRuntimeError("Expected ${fn.params.size} args, got ${args.size}")

@@ -21,6 +21,7 @@ enum class TokenType {
     TRUE, FALSE, NULL,
     AND, OR, NOT,
     CLASS, THIS, PRIVATE, PUBLIC,
+    PROPERTY,
 
     // ---------- 运算符 ----------
     PLUS, MINUS, STAR, SLASH, PERCENT,
