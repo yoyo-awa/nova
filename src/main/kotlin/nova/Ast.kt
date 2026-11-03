@@ -127,6 +127,13 @@ sealed class Stmt {
     data class Property(
         val name: String,
         val initializer: Expr,
-        val isConst: Boolean = false
+        val isConst: Boolean = false,
+        val isRuntime: Boolean = false
+    ) : Stmt()
+
+    /** import math; —— 标准库；import .utils; —— 本地文件 */
+    data class Import(
+        val path: List<String>,
+        val isLocal: Boolean   // ← true = .utils；false = math
     ) : Stmt()
 }

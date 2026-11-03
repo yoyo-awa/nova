@@ -9,6 +9,7 @@ package nova
  *   - 新增 DOT        （成员访问运算符 .）
  */
 enum class TokenType {
+    IMPORT,
     // ---------- 字面量 ----------
     NUMBER, STRING, IDENT,
 
@@ -22,6 +23,7 @@ enum class TokenType {
     AND, OR, NOT,
     CLASS, THIS, PRIVATE, PUBLIC,
     PROPERTY,
+    RUNTIME,
 
     // ---------- 运算符 ----------
     PLUS, MINUS, STAR, SLASH, PERCENT,

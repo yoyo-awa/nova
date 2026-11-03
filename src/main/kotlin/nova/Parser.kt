@@ -147,9 +147,32 @@ class Parser(private val tokens: List<Token>) {
             match(TokenType.BREAK)  -> breakStatement()
             match(TokenType.CONTINUE) -> continueStatement()
             match(TokenType.TRY)      -> tryCatchStatement()
+            match(TokenType.RUNTIME) -> {
+                consume(TokenType.PROPERTY, "Expect 'property' after 'runtime'")
+                propertyStatement(isRuntime = true)
+            }
+            match(TokenType.PROPERTY) -> propertyStatement(isRuntime = false)
             match(TokenType.PROPERTY) -> propertyStatement()
+            match(TokenType.IMPORT) -> importDeclaration()
             else -> expressionStatement()
         }
+    }
+
+    private fun importDeclaration(): Stmt {
+        var isLocal = false
+        if (match(TokenType.DOT)) {
+            isLocal = true
+        }
+
+        val parts = mutableListOf<String>()
+        parts.add(consume(TokenType.IDENT, "Expect module name").lexeme)
+
+        while (match(TokenType.DOT)) {
+            parts.add(consume(TokenType.IDENT, "Expect module name").lexeme)
+        }
+
+        consume(TokenType.SEMICOLON, "Expect ';' after import")
+        return Stmt.Import(parts, isLocal)
     }
 
     private fun ifStatement(): Stmt {
@@ -243,7 +266,7 @@ class Parser(private val tokens: List<Token>) {
         return Stmt.TryCatch(tryBlock, catchVar, catchBlock)
     }
 
-    private fun propertyStatement(): Stmt {
+    private fun propertyStatement(isRuntime: Boolean = false): Stmt {
         var isConst = false
         if (match(TokenType.CONST)) {
             isConst = true
@@ -251,15 +274,12 @@ class Parser(private val tokens: List<Token>) {
         } else {
             consume(TokenType.VAR, "Expect 'var' after 'property'")
         }
-
         val name = consume(TokenType.IDENT, "Expect property name").lexeme
         consume(TokenType.ASSIGN, "Expect '=' after property name")
         val init = expression()
         consume(TokenType.SEMICOLON, "Expect ';' after property")
-
-        return Stmt.Property(name, init, isConst)
+        return Stmt.Property(name, init, isConst, isRuntime)
     }
-
 
     // ============================================================
     //                    表达式（按优先级分层）

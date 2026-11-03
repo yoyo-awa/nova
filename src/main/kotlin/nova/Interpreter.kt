@@ -21,9 +21,10 @@ class ReturnSignal(val value: Any?) : RuntimeException(null, null, false, false)
  *   - 执行 Stmt.NamespaceDecl：创建 NovaNamespace，把 body 定义到其中
  *   - 求值 Expr.MemberAccess / Expr.MemberSet
  */
-class Interpreter (private val args: List<String> = emptyList()) {
+class Interpreter (private val args: List<String> = emptyList(), private var basePath: String = "." ) {
 
     private val globals = Environment()
+    private val importedFiles = mutableSetOf<String>()
 
     init {
 
@@ -61,9 +62,52 @@ class Interpreter (private val args: List<String> = emptyList()) {
     // ============================================================
 
     private fun execute(stmt: Stmt, env: Environment) {
+        //println("DEBUG execute: ${stmt::class.simpleName}")
         when (stmt) {
 
             is Stmt.Expression -> evaluate(stmt.expr, env)
+
+            is Stmt.Import -> {
+                if (!stmt.isLocal) {
+                    // 标准库 —— 已注册 —— 什么都不做
+                    // 或者“检查”命名空间存在
+                    val name = stmt.path.first().replaceFirstChar { it.uppercase() }
+                    if (globals.getOrNull(name) == null) {
+                        throw NovaRuntimeError("Unknown standard library module '${stmt.path.joinToString(".")}'")
+                    }
+                    return
+                }
+
+                // 本地文件
+                val relPath = stmt.path.joinToString("/") + ".nv"
+                val resolved = java.io.File(basePath, relPath)
+                val absolutePath = resolved.canonicalPath
+
+                if (importedFiles.contains(absolutePath)) return
+                importedFiles.add(absolutePath)
+
+                if (!resolved.exists()) {
+                    throw NovaRuntimeError("Import: file not found: ${stmt.path.joinToString(".")}")
+                }
+
+                val source = try {
+                    resolved.readText(Charsets.UTF_8)
+                } catch (e: Exception) {
+                    throw NovaRuntimeError("Import: cannot read '${relPath}': ${e.message}")
+                }
+
+                val tokens = Lexer(source).tokenize()
+                val ast = Parser(tokens).parse()
+
+                // 临时换 basePath
+                val oldBasePath = basePath
+                basePath = resolved.parent ?: basePath
+                try {
+                    for (s in ast) execute(s, globals)
+                } finally {
+                    basePath = oldBasePath
+                }
+            }
 
             // var name = init;
             is Stmt.Var -> env.define(stmt.name, evaluate(stmt.initializer, env), stmt.isConst)
@@ -113,16 +157,11 @@ class Interpreter (private val args: List<String> = emptyList()) {
             }
 
             is Stmt.Property -> {
-                // 从当前环境拿到"当前函数对象"
+                if (!stmt.isRuntime) return
                 val fn = env.getOrNull("__fn__") as? NovaFunction
-                    ?: throw NovaRuntimeError(
-                        "'property' can only be used inside a function")
-
+                    ?: throw NovaRuntimeError("'property' can only be used inside a function")
                 fn.fields[stmt.name] = evaluate(stmt.initializer, env)
-
-                if (stmt.isConst) {
-                    fn.constFields.add(stmt.name)
-                }
+                if (stmt.isConst) fn.constFields.add(stmt.name)
             }
 
             is Stmt.ForEachIndex -> {
@@ -218,6 +257,13 @@ class Interpreter (private val args: List<String> = emptyList()) {
             // func name(...) { ... }
             is Stmt.FuncDecl -> {
                 val fn = NovaFunction(stmt.params, stmt.body, env, stmt.name)
+                for (s in stmt.body) {
+                    if (s is Stmt.Property && !s.isRuntime) {
+                        fn.fields[s.name] = evaluate(s.initializer, env)
+                        if (s.isConst) fn.constFields.add(s.name)
+                    }
+                }
+
                 env.define(stmt.name, fn)
             }
 
@@ -578,6 +624,7 @@ class Interpreter (private val args: List<String> = emptyList()) {
                         v
                     }
                     is NovaFunction -> {
+
                         if (target.constFields.contains(expr.name)) {
                             throw NovaRuntimeError(
                                 "Cannot assign to const property '${expr.name}' of function '${target.name}'")
