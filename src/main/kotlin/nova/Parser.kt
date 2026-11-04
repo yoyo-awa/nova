@@ -29,6 +29,7 @@ class Parser(private val tokens: List<Token>) {
         if (match(TokenType.VAR))       return varDeclaration()
         if (match(TokenType.CONST))     return constVarDeclaration()
         if (match(TokenType.NAMESPACE)) return namespaceDeclaration()
+        if (match(TokenType.MODULE))    return moduleDeclaration()
         return statement()
     }
 
@@ -137,6 +138,45 @@ class Parser(private val tokens: List<Token>) {
         return Stmt.NamespaceDecl(name, body)
     }
 
+    private fun importDeclaration(): Stmt {
+        val parts = mutableListOf<String>()
+
+        // 可选的前导点
+        val hasLeadingDot = match(TokenType.DOT)
+        if (hasLeadingDot) {
+            // .utils 或 .lib.utils
+            parts.add(consume(TokenType.IDENT, "Expect module name after '.'").lexeme)
+        } else {
+            // 标准库，如 Math
+            parts.add(consume(TokenType.IDENT, "Expect module name").lexeme)
+        }
+
+        // 后续 .xxx
+        while (match(TokenType.DOT)) {
+            parts.add(consume(TokenType.IDENT, "Expect name after '.'").lexeme)
+        }
+
+        consume(TokenType.SEMICOLON, "Expect ';' after import")
+        return Stmt.Import(hasLeadingDot, parts)
+    }
+
+    private fun moduleDeclaration(): Stmt {
+        val name = if (check(TokenType.IDENT)) {
+            consume(TokenType.IDENT, "Expect module name").lexeme
+        } else {
+            null
+        }
+
+        consume(TokenType.LBRACE, "Expect '{' after 'module'")
+        val body = mutableListOf<Stmt>()
+        while (!check(TokenType.RBRACE) && !isAtEnd()) {
+            body.add(declaration())
+        }
+        consume(TokenType.RBRACE, "Expect '}' after module body")
+
+        return Stmt.ModuleDecl(name, body)
+    }
+
     private fun statement(): Stmt {
         return when {
             match(TokenType.IF)     -> ifStatement()
@@ -158,22 +198,6 @@ class Parser(private val tokens: List<Token>) {
         }
     }
 
-    private fun importDeclaration(): Stmt {
-        var isLocal = false
-        if (match(TokenType.DOT)) {
-            isLocal = true
-        }
-
-        val parts = mutableListOf<String>()
-        parts.add(consume(TokenType.IDENT, "Expect module name").lexeme)
-
-        while (match(TokenType.DOT)) {
-            parts.add(consume(TokenType.IDENT, "Expect module name").lexeme)
-        }
-
-        consume(TokenType.SEMICOLON, "Expect ';' after import")
-        return Stmt.Import(parts, isLocal)
-    }
 
     private fun ifStatement(): Stmt {
         consume(TokenType.LPAREN, "Expect '(' after 'if'")

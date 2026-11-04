@@ -202,6 +202,8 @@ class NovaNamespace(val name: String) {
     /** 是否包含某成员 */
     fun has(member: String) = members.containsKey(member)
 
+    fun snapshot(): Map<String, Any?> = members.toMap()
+
     override fun toString() = "<namespace $name>"
 }
 
@@ -370,4 +372,31 @@ class BoundReceiverMethod(
     val name: String
 ) {
     override fun toString() = "<bound ${name}>"
+}
+
+/**
+ * Nova 模块。
+ * 通过 `module { }` 或 `module name { }` 创建。
+ */
+class NovaModule(
+    val name: String,
+    val path: String? = null
+) {
+    private val members = mutableMapOf<String, Any?>()
+
+    fun define(name: String, value: Any?) {
+        members[name] = value
+    }
+
+    fun get(name: String): Any? {
+        if (!members.containsKey(name))
+            throw NovaRuntimeError("Module '${this.name}' has no member '$name'")
+        return members[name]
+    }
+
+    fun has(name: String) = members.containsKey(name)
+
+    fun snapshot(): Map<String, Any?> = members.toMap()
+
+    override fun toString() = "<module $name>"
 }

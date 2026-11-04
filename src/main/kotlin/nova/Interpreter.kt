@@ -21,10 +21,9 @@ class ReturnSignal(val value: Any?) : RuntimeException(null, null, false, false)
  *   - 执行 Stmt.NamespaceDecl：创建 NovaNamespace，把 body 定义到其中
  *   - 求值 Expr.MemberAccess / Expr.MemberSet
  */
-class Interpreter (private val args: List<String> = emptyList(), private var basePath: String = "." ) {
+class Interpreter (private val args: List<String> = emptyList(), private val fileName: String? = null ) {
 
     private val globals = Environment()
-    private val importedFiles = mutableSetOf<String>()
 
     init {
 
@@ -67,46 +66,65 @@ class Interpreter (private val args: List<String> = emptyList(), private var bas
 
             is Stmt.Expression -> evaluate(stmt.expr, env)
 
-            is Stmt.Import -> {
-                if (!stmt.isLocal) {
-                    // 标准库 —— 已注册 —— 什么都不做
-                    // 或者“检查”命名空间存在
-                    val name = stmt.path.first().replaceFirstChar { it.uppercase() }
-                    if (globals.getOrNull(name) == null) {
-                        throw NovaRuntimeError("Unknown standard library module '${stmt.path.joinToString(".")}'")
+            is Stmt.ModuleDecl -> {
+                val moduleName = stmt.name ?: run {
+                    val f = fileName ?: throw NovaRuntimeError(
+                        "module { } requires a file name; use module name { } instead")
+                    val base = f.substringAfterLast('/').substringAfterLast('\\')
+                    base.substringBeforeLast('.')
+                }
+
+                val moduleEnv = Environment(env)
+                val module = NovaModule(moduleName, fileName)
+
+                for (s in stmt.body) {
+                    when (s) {
+                        is Stmt.Var -> moduleEnv.define(s.name, evaluate(s.initializer, moduleEnv), s.isConst)
+                        is Stmt.FuncDecl -> {
+                            val fn = NovaFunction(s.params, s.body, moduleEnv, s.name)
+                            moduleEnv.define(s.name, fn)
+                        }
+                        is Stmt.ModuleDecl -> execute(s, moduleEnv)
+                        else -> execute(s, moduleEnv)
                     }
-                    return
                 }
 
-                // 本地文件
-                val relPath = stmt.path.joinToString("/") + ".nv"
-                val resolved = java.io.File(basePath, relPath)
-                val absolutePath = resolved.canonicalPath
-
-                if (importedFiles.contains(absolutePath)) return
-                importedFiles.add(absolutePath)
-
-                if (!resolved.exists()) {
-                    throw NovaRuntimeError("Import: file not found: ${stmt.path.joinToString(".")}")
+                for ((k, v) in moduleEnv.snapshot()) {
+                    module.define(k, v)
                 }
 
-                val source = try {
-                    resolved.readText(Charsets.UTF_8)
-                } catch (e: Exception) {
-                    throw NovaRuntimeError("Import: cannot read '${relPath}': ${e.message}")
+                env.define(moduleName, module)
+            }
+
+            is Stmt.Import -> {
+                val fullName = stmt.parts.joinToString(".")
+                val moduleName = stmt.parts.last()
+
+                if (env.getOrNull(moduleName) is NovaModule) return
+
+                val path = if (stmt.isRelative) {
+                    // 相对路径：基于当前文件的绝对目录
+                    val baseDir = fileName?.let { java.io.File(it).absoluteFile.parentFile }
+                        ?: java.io.File(".").absoluteFile
+                    java.io.File(baseDir, stmt.parts.joinToString("/") + ".nv").path
+                } else {
+                    // 标准库：基于 jar 所在目录的 std-libs/
+                    val baseDir = java.io.File(".").absoluteFile
+                    java.io.File(baseDir, "std-libs/" + stmt.parts.joinToString("/") + ".nv").path
                 }
 
-                val tokens = Lexer(source).tokenize()
-                val ast = Parser(tokens).parse()
-
-                // 临时换 basePath
-                val oldBasePath = basePath
-                basePath = resolved.parent ?: basePath
-                try {
-                    for (s in ast) execute(s, globals)
-                } finally {
-                    basePath = oldBasePath
+                val file = java.io.File(path)
+                if (!file.exists()) {
+                    throw NovaRuntimeError("Cannot find module '$fullName' at '$path'")
                 }
+
+
+                val moduleInterpreter = Interpreter(args, file.absolutePath)
+                moduleInterpreter.loadModule(file.absolutePath, moduleName, env)
+
+                val module = moduleInterpreter.globals.getOrNull(moduleName) as? NovaModule
+                    ?: throw NovaRuntimeError("Module '$fullName' did not export a module")
+                env.define(moduleName, module)
             }
 
             // var name = init;
@@ -434,6 +452,7 @@ class Interpreter (private val args: List<String> = emptyList(), private var bas
                 val target = evaluate(expr.target, env)
                 when (target) {
                     is NovaNamespace -> target.get(expr.name)
+                    is NovaModule -> target.get(expr.name)
                     is NovaPair -> when (expr.name) {
                         "key" -> target.key
                         "value" -> target.value
@@ -941,6 +960,44 @@ class Interpreter (private val args: List<String> = emptyList(), private var bas
         val ns = globals.getOrNull(nsName) as? NovaNamespace ?: return null
         return if (ns.has(name)) ns.get(name) as? BuiltinFunction else null
     }
+
+    fun loadModule(path: String, moduleName: String, targetEnv: Environment) {
+        val source = java.io.File(path).readText(Charsets.UTF_8)
+        val tokens = Lexer(source).tokenize()
+        val ast = Parser(tokens).parse()
+
+        val moduleEnv = Environment(globals)
+        for (s in ast) {
+            execute(s, moduleEnv)
+        }
+
+        val module = NovaModule(moduleName, path)
+
+        for ((k, v) in moduleEnv.snapshot()) {
+            when (v) {
+                is NovaModule -> {
+                    for ((nk, nv) in v.snapshot()) {
+                        module.define(nk, nv)
+                        targetEnv.define(nk, nv)   // 顶层注入
+                    }
+                }
+                is NovaNamespace -> {
+                    for ((nk, nv) in v.snapshot()) {
+                        module.define(nk, nv)
+                        targetEnv.define(nk, nv)
+                    }
+                }
+                else -> {
+                    module.define(k, v)
+                    targetEnv.define(k, v)         // 顶层注入
+                }
+            }
+        }
+
+        globals.define(moduleName, module)
+        targetEnv.define(moduleName, module)
+    }
+
 
     private fun callFunctionValue(callee: Any?, args: List<Any?>, env: Environment): Any? {
         return when (callee) {

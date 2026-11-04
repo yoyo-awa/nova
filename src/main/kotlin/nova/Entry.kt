@@ -59,7 +59,7 @@ private fun runFile(path: String, extraArgs: List<String>) {
     // Read + run
     try {
         val source = Files.readString(p, StandardCharsets.UTF_8)
-        Nova.run(source, extraArgs, p.parent?.toString() ?: ".")
+        Nova.run(source, extraArgs, p.toString())
     } catch (e: java.io.IOException) {
         System.err.println("Failed to read file: ${e.message}")
         exitProcess(1)

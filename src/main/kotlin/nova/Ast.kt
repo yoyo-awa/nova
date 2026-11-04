@@ -131,9 +131,16 @@ sealed class Stmt {
         val isRuntime: Boolean = false
     ) : Stmt()
 
+
+    /** module { ... } 或 module name { ... } */
+    data class ModuleDecl(
+        val name: String?,
+        val body: List<Stmt>
+    ) : Stmt()
+
     /** import math; —— 标准库；import .utils; —— 本地文件 */
     data class Import(
-        val path: List<String>,
-        val isLocal: Boolean   // ← true = .utils；false = math
+        val isRelative: Boolean,   // 是否有前导点
+        val parts: List<String>    // 路径部分
     ) : Stmt()
 }

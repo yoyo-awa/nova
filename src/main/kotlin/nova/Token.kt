@@ -1,15 +1,9 @@
 package nova
 
-/**
- * TokenType 枚举：定义 Nova 语言所有词法单元类型。
- * 本次变更：
- *   - LET → NEW       （变量声明关键字换成 var）
- *   - FN  → FUNC      （函数定义关键字换成 func）
- *   - 新增 NAMESPACE  （命名空间声明）
- *   - 新增 DOT        （成员访问运算符 .）
- */
+
 enum class TokenType {
     IMPORT,
+    MODULE,
     // ---------- 字面量 ----------
     NUMBER, STRING, IDENT,
 
