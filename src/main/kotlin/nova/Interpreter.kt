@@ -31,7 +31,7 @@ class Interpreter (private val args: List<String> = emptyList(), private val fil
             args.toMutableList()
         })
 
-        StdLib.register(globals, this)
+        StdReg.register(globals, this)
     }
 
     fun interpret(statements: List<Stmt>) {
@@ -108,6 +108,9 @@ class Interpreter (private val args: List<String> = emptyList(), private val fil
                         ?: java.io.File(".").absoluteFile
                     java.io.File(baseDir, stmt.parts.joinToString("/") + ".nv").path
                 } else {
+                    if (StdLibs.importModule(stmt.parts[0], globals, this)) {
+                        return
+                    }
                     // 标准库：基于 jar 所在目录的 std-libs/
                     val baseDir = java.io.File(".").absoluteFile
                     java.io.File(baseDir, "std-libs/" + stmt.parts.joinToString("/") + ".nv").path

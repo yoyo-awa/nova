@@ -18,6 +18,8 @@ repositories {
 
 dependencies {
     testImplementation(kotlin("test"))
+    implementation("org.json:json:20240303")
+    implementation("org.tomlj:tomlj:1.1.1")
 }
 
 kotlin {

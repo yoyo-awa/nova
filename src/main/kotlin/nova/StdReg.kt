@@ -24,7 +24,7 @@ import kotlin.random.Random as KRandom
  *
  * Interpreter 初始化时调用 StdLib.register(globals)。
  */
-object StdLib {
+object StdReg {
 
     /**
      * 把全部标准库注册到给定的全局环境。
@@ -622,16 +622,16 @@ object StdLib {
 
     // ----------------------------------------------------------------------------------------
 
-    private fun requireMap(args: List<Any?>, i: Int, fn: String): NovaMap {
+    fun requireMap(args: List<Any?>, i: Int, fn: String): NovaMap {
         return args.getOrNull(i) as? NovaMap
             ?: throw NovaRuntimeError("Map.$fn: argument ${i + 1} must be a map")
     }
 
-    private fun requireString(args: List<Any?>, i: Int, fn: String): String =
+    fun requireString(args: List<Any?>, i: Int, fn: String): String =
         args.getOrNull(i) as? String
             ?: throw NovaRuntimeError("$fn: argument ${i + 1} must be a string")
 
-    private fun requireInt(args: List<Any?>, i: Int, fn: String): Int =
+    fun requireInt(args: List<Any?>, i: Int, fn: String): Int =
         when (val v = args.getOrNull(i)) {
             is Int -> v
             is Double -> v.toInt()
@@ -639,11 +639,11 @@ object StdLib {
         }
 
     @Suppress("UNCHECKED_CAST")
-    private fun requireArray(args: List<Any?>, i: Int, fn: String): MutableList<Any?> =
+    fun requireArray(args: List<Any?>, i: Int, fn: String): MutableList<Any?> =
         args.getOrNull(i) as? MutableList<Any?>
             ?: throw NovaRuntimeError("$fn: argument ${i + 1} must be an array")
 
-    private fun numOf(args: List<Any?>, i: Int, fn: String): Double =
+    fun numOf(args: List<Any?>, i: Int, fn: String): Double =
         when (val v = args.getOrNull(i)) {
             is Int -> v.toDouble()
             is Double -> v
