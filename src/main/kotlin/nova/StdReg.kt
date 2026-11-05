@@ -44,6 +44,10 @@ object StdReg {
         val out = console.get("Out") as NovaNamespace
         globals.define("println", out.get("println"))
         globals.define("print", out.get("print"))
+
+        globals.define("isnull", BuiltinFunction("isnull") { args ->
+            args.getOrNull(0) == null
+        })
     }
 
     // ============================================================
