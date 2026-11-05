@@ -21,7 +21,7 @@ class ReturnSignal(val value: Any?) : RuntimeException(null, null, false, false)
  *   - 执行 Stmt.NamespaceDecl：创建 NovaNamespace，把 body 定义到其中
  *   - 求值 Expr.MemberAccess / Expr.MemberSet
  */
-class Interpreter (private val args: List<String> = emptyList(), private val fileName: String? = null ) {
+class Interpreter (private val args: List<String> = emptyList(), private val fileName: String? = null, private val jarDir: String = ".") {
 
     private val globals = Environment()
 
@@ -102,19 +102,7 @@ class Interpreter (private val args: List<String> = emptyList(), private val fil
 
                 if (env.getOrNull(moduleName) is NovaModule) return
 
-                val path = if (stmt.isRelative) {
-                    // 相对路径：基于当前文件的绝对目录
-                    val baseDir = fileName?.let { java.io.File(it).absoluteFile.parentFile }
-                        ?: java.io.File(".").absoluteFile
-                    java.io.File(baseDir, stmt.parts.joinToString("/") + ".nv").path
-                } else {
-                    if (StdLibs.importModule(stmt.parts[0], globals, this)) {
-                        return
-                    }
-                    // 标准库：基于 jar 所在目录的 std-libs/
-                    val baseDir = java.io.File(".").absoluteFile
-                    java.io.File(baseDir, "std-libs/" + stmt.parts.joinToString("/") + ".nv").path
-                }
+                val path = java.io.File(jarDir, "std-libs/" + stmt.parts.joinToString("/") + ".nv").absolutePath
 
                 val file = java.io.File(path)
                 if (!file.exists()) {
@@ -199,6 +187,10 @@ class Interpreter (private val args: List<String> = emptyList(), private val fil
 
                         val iterEnv = Environment(loopEnv)
                         iterEnv.define(stmt.varName, value)
+                        if (stmt.indexName != null) {
+                            iterEnv.define(stmt.indexName, index)
+                        }
+
                         try {
                             executeBlock(stmt.body, iterEnv)
                         } catch (e: BreakSignal) {
@@ -208,7 +200,7 @@ class Interpreter (private val args: List<String> = emptyList(), private val fil
                         }
                     }
                 } else {
-                    // 自动长度：越界 / null 停
+                    // 自动长度
                     var index = 0
                     while (true) {
                         loopEnv.define("$", index)
@@ -218,21 +210,24 @@ class Interpreter (private val args: List<String> = emptyList(), private val fil
                         } catch (e: NovaRuntimeError) {
                             break
                         }
-
                         if (value == null) break
 
                         val iterEnv = Environment(loopEnv)
                         iterEnv.define(stmt.varName, value)
+                        if (stmt.indexName != null) {
+                            iterEnv.define(stmt.indexName, index)
+                        }
+
                         try {
                             executeBlock(stmt.body, iterEnv)
                         } catch (e: BreakSignal) {
                             break
                         } catch (e: ContinueSignal) {
-                            index += 1
+                            index = index + 1
                             continue
                         }
 
-                        index += 1
+                        index = index + 1
                     }
                 }
             }

@@ -319,6 +319,22 @@ object StdReg {
             requireString(args, 0, "isEmpty").isEmpty()
         })
 
+        str.define("fromCharCode", BuiltinFunction("fromCharCode") { args ->
+            val code = requireInt(args, 0, "fromCharCode")
+            if (code < 0 || code > 0x10FFFF) {
+                throw NovaRuntimeError("String.fromCharCode: invalid code point $code")
+            }
+            String(Character.toChars(code))
+        })
+
+        str.define("getCharCode", BuiltinFunction("getCharCode") { args ->
+            val s = requireString(args, 0, "getCharCode")
+            if (s.codePointCount(0, s.length) != 1) {
+                throw NovaRuntimeError("String.getCharCode: expected a single character, got '${s}'")
+            }
+            s.codePointAt(0)
+        })
+
         globals.define("String", str)
     }
 

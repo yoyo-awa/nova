@@ -219,18 +219,37 @@ class Parser(private val tokens: List<Token>) {
     }
 
     private fun forStatement(): Stmt {
-        if (check(TokenType.IDENT) && checkNext(TokenType.ASSIGN)) {
-            val varName = consume(TokenType.IDENT, "Expect variable name").lexeme
-            consume(TokenType.ASSIGN, "Expect '=' after variable")
-            val collection = expression()
+        if (check(TokenType.IDENT)) {
+            // 先看是不是 for 名字 = ... 或 for 名字, 名字 = ...
+            val save = pos
+            val firstName = advance().lexeme
 
-            var sizeExpr: Expr? = null
             if (match(TokenType.COMMA)) {
-                sizeExpr = expression()
+                // for f1, f2 = ...
+                val secondName = consume(TokenType.IDENT, "Expect index variable name").lexeme
+                consume(TokenType.ASSIGN, "Expect '=' after variables")
+                val collection = expression()
+                var sizeExpr: Expr? = null
+                if (match(TokenType.COMMA)) {
+                    sizeExpr = expression()
+                }
+                return Stmt.ForEachIndex(firstName, secondName, collection, sizeExpr, block())
             }
 
-            return Stmt.ForEachIndex(varName, collection, sizeExpr, block())
+            if (match(TokenType.ASSIGN)) {
+                // for f1 = ...
+                val collection = expression()
+                var sizeExpr: Expr? = null
+                if (match(TokenType.COMMA)) {
+                    sizeExpr = expression()
+                }
+                return Stmt.ForEachIndex(firstName, null, collection, sizeExpr, block())
+            }
+
+            // 不是新语法，回退
+            pos = save
         }
+
         // 旧语法：for ( ... )
         consume(TokenType.LPAREN, "Expect '(' after 'for'")
         val init = if (match(TokenType.SEMICOLON)) null

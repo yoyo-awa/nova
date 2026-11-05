@@ -119,6 +119,7 @@ sealed class Stmt {
 
     data class ForEachIndex(
         val varName: String,
+        val indexName: String?,
         val collectionExpr: Expr,     // 含 $ 的表达式
         val sizeExpr: Expr?,          // ← 新增：可选“显式长度”
         val body: List<Stmt>

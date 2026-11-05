@@ -1,4 +1,5 @@
 package nova
+import nova.StdReg.requireString
 import org.json.JSONArray
 import org.json.JSONObject
 import org.tomlj.Toml
@@ -22,7 +23,7 @@ object StdLibs {
         val json = NovaNamespace("json")
 
         json.define("parse", BuiltinFunction("parse") { args ->
-            val text = StdReg.requireString(args, 0, "parse")
+            val text = requireString(args, 0, "parse")
             try {
                 val element = org.json.JSONTokener(text).nextValue()
                 jsonToNova(element)

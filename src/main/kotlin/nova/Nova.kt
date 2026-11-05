@@ -6,11 +6,12 @@ object Nova {
     fun run(
         source: String,
         args: List<String> = emptyList(),
-        fileName: String? = null
+        fileName: String? = null,
+        jarDir: String = ".",
     ): List<Stmt> {
         val tokens = Lexer(source).tokenize()
         val ast = Parser(tokens).parse()
-        Interpreter(args, fileName).interpret(ast)
+        Interpreter(args, fileName, jarDir).interpret(ast)
         return ast
     }
 }
