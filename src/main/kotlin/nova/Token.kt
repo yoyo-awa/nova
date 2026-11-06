@@ -25,6 +25,7 @@ enum class TokenType {
     DOT,
     AT,
     SINGLE_ARROW, DOUBLE_ARROW,// .          成员访问（新增）
+    COLON_ASSIGN,
 
     // ---------- 分隔符 ----------
     LPAREN, RPAREN, LBRACE, RBRACE,

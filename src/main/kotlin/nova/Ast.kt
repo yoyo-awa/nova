@@ -145,6 +145,13 @@ sealed class Stmt {
         val body: List<Stmt>
     ) : Stmt()
 
+    /** name := expr; 或 name(params) := expr; */
+    data class MacroDecl(
+        val name: String,
+        val params: List<String>?,   // null = 无参宏
+        val body: Expr
+    ) : Stmt()
+
     /** import math; —— 标准库；import .utils; —— 本地文件 */
     data class Import(
         val isRelative: Boolean,   // 是否有前导点

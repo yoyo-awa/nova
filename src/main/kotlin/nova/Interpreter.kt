@@ -103,9 +103,11 @@ class Interpreter (
 
             is Stmt.Import -> {
                 val fullName = stmt.parts.joinToString(".")
+                if (!stmt.isRelative && StdLibs.importModule(fullName, env, this)) return
                 val moduleName = stmt.parts.last()
 
                 if (env.getOrNull(moduleName) is NovaModule) return
+                if (StdLibs.importModule(fullName, env, this)) return
 
                 val path = java.io.File(libDir, stmt.parts.joinToString("/") + ".nv").absolutePath
                 val file = java.io.File(path)
@@ -325,6 +327,12 @@ class Interpreter (
                 env.define(stmt.name, ns)
             }
 
+            is Stmt.MacroDecl -> {
+                // 宏在 MacroExpander 阶段已展开，正常不会到这里
+                // 如果到这里，说明 MacroExpander 被绕过了
+                throw NovaRuntimeError("Macro '${stmt.name}' was not expanded (?")
+            }
+
             is Stmt.IndexAssign -> {
                 val target = evaluate(stmt.target, env)
                 val index = evaluate(stmt.index, env)
@@ -470,6 +478,31 @@ class Interpreter (
                     }
 
                     is NovaInstance -> {
+                        if (expr.name == "invoke") {
+                            return BoundBuiltinMethodWithArgs("invoke") { args ->
+                                val methodName = args.getOrNull(0) as? String
+                                    ?: throw NovaRuntimeError("invoke: first argument must be a method name")
+                                val params = args.drop(1)
+
+                                // 找方法（沿继承链）
+                                val method = findMethodInChain(target.klass, methodName)
+                                    ?: throw NovaRuntimeError(
+                                        "Instance of '${target.klass.name}' has no method '$methodName'")
+
+                                // 私有方法：只有 this 能调
+                                if (!method.isPublic) {
+                                    val currentThis = env.getOrNull("this")
+                                    if (currentThis !== target) {
+                                        throw NovaRuntimeError(
+                                            "Method '$methodName' is private in class '${target.klass.name}'")
+                                    }
+                                }
+
+                                // 用 BoundMethod 调用（this 绑定到 target）
+                                val bound = BoundMethod(target, method.fn, findDefiningClass(target.klass, methodName))
+                                callFunctionValue(bound, params, env)
+                            }
+                        }
                         // 先查字段（沿继承链）
                         val fieldDef = findFieldInChain(target.klass, expr.name)
                         if (fieldDef != null) {
@@ -978,19 +1011,14 @@ class Interpreter (
         for ((k, v) in moduleEnv.snapshot()) {
             when (v) {
                 is NovaModule -> {
-                    for ((nk, nv) in v.snapshot()) {
-                        module.define(nk, nv)
-                        targetEnv.define(nk, nv)   // 顶层注入
-                    }
+
+                    module.define(v.name, v)
+
                 }
                 is NovaNamespace -> {
-                    for ((nk, nv) in v.snapshot()) {
-                        module.define(nk, nv)
-                        targetEnv.define(nk, nv)
-                    }
+                    targetEnv.define(v.name, v)
                 }
                 else -> {
-                    module.define(k, v)
                     targetEnv.define(k, v)         // 顶层注入
                 }
             }

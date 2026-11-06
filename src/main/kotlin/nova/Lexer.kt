@@ -107,10 +107,15 @@ class Lexer(private val source: String) {
             if (source[pos] == '\\' && pos + 1 < source.length) {
                 pos++
                 sb.append(when (source[pos]) {
-                    'n' -> '\n'; 't' -> '\t'; '"' -> '"'; '\\' -> '\\'
+                    'n' -> '\n'
+                    't' -> '\t'
+                    '"' -> '"'
+                    '\\' -> '\\'
                     else -> source[pos]
                 })
-            } else sb.append(source[pos])
+            } else {
+                sb.append(source[pos])
+            }
             pos++
         }
         if (pos >= source.length)
@@ -144,6 +149,7 @@ class Lexer(private val source: String) {
             "|>" -> { add(TokenType.PIPE, two); return }
             "->" -> { add(TokenType.SINGLE_ARROW, two); return }
             "=>" -> { add(TokenType.DOUBLE_ARROW, two); return }
+            ":=" -> { add(TokenType.COLON_ASSIGN, two); return }
         }
         when (c) {
             '+' -> add(TokenType.PLUS, "+")

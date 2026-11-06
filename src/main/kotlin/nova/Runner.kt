@@ -1,8 +1,6 @@
 package nova
 
-object Nova {
-    @JvmStatic
-    @JvmOverloads
+object Runner {
     fun run(
         source: String,
         args: List<String> = emptyList(),
@@ -12,7 +10,8 @@ object Nova {
     ): List<Stmt> {
         val tokens = Lexer(source).tokenize()
         val ast = Parser(tokens).parse()
-        Interpreter(args, fileName, jarDir,libDir).interpret(ast)
-        return ast
+        val expandedAst = MacroExpander().expand(ast)
+        Interpreter(args, fileName, jarDir, libDir).interpret(expandedAst)
+        return expandedAst
     }
 }

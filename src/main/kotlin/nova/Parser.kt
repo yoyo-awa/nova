@@ -24,6 +24,52 @@ class Parser(private val tokens: List<Token>) {
 
     /** 声明：var 变量 / func 函数 / namespace 命名空间 / 普通语句 */
     private fun declaration(): Stmt {
+        // 尝试宏定义：IDENT := expr; 或 IDENT(params) := expr;
+        if (check(TokenType.IDENT)) {
+            val save = pos
+            val name = advance().lexeme
+
+            if (match(TokenType.COLON_ASSIGN)) {
+                val body = expression()
+                consume(TokenType.SEMICOLON, "Expect ';' after macro")
+                return Stmt.MacroDecl(name, null, body)
+            }
+
+            if (match(TokenType.LPAREN)) {
+                val params = mutableListOf<String>()
+                var valid = true
+
+                if (!check(TokenType.RPAREN)) {
+                    do {
+                        if (check(TokenType.IDENT)) {
+                            params.add(advance().lexeme)
+                        } else {
+                            valid = false
+                            break
+                        }
+                    } while (match(TokenType.COMMA))
+                }
+
+                // 只有“参数列表合法 + 后面是 )”才继续
+                if (valid && check(TokenType.RPAREN)) {
+                    advance()  // 消费 )
+
+                    // 真正的带参宏：name(params) := expr;
+                    if (match(TokenType.COLON_ASSIGN)) {
+                        val body = expression()
+                        consume(TokenType.SEMICOLON, "Expect ';' after macro")
+                        return Stmt.MacroDecl(name, params, body)
+                    }
+                }
+
+                // 不是宏，回退到 name 之前
+                pos = save
+            } else {
+                // name 后面不是 (，不是宏，回退
+                pos = save
+            }
+        }
+
         val annotations = parseAnnotations()
         if (match(TokenType.FUNC)) return funcDeclaration(annotations)
         if (match(TokenType.CLASS))   return classDeclaration()

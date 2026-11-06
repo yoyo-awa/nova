@@ -64,7 +64,7 @@ private fun runFile(path: String, extraArgs: List<String>, libDir: String) {
             java.io.File(it.toURI()).parentFile?.absolutePath
         } ?: "."
 
-        Nova.run(source, extraArgs, p.toString(), jarDir, libDir)
+        Runner.run(source, extraArgs, p.toString(), jarDir, libDir)
     } catch (e: java.io.IOException) {
         System.err.println("Failed to read file: ${e.message}")
         exitProcess(1)
