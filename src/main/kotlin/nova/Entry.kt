@@ -7,18 +7,37 @@ import java.nio.file.Path
 import kotlin.system.exitProcess
 
 fun main(args: Array<String>) {
-
     if (args.isEmpty()) {
-        System.err.println("Usage: nova <file.nv> [args...]")
+        System.err.println("Usage: nova <file.nv> [path/to/std-libs/] [args...]")
         exitProcess(1)
     }
 
     val file = args[0]
-    val extraArgs = args.drop(1)
-    runFile(file, extraArgs)
+
+    // 判断第二个参数是不是 std-libs 目录路径
+    var stdLibsDir: String? = null
+    var extraArgsStart = 1
+    if (args.size >= 2) {
+        val candidate = args[1]
+        val f = java.io.File(candidate)
+        if (f.isDirectory || candidate.endsWith("/") || candidate.endsWith("\\")) {
+            stdLibsDir = candidate
+            extraArgsStart = 2
+        }
+    }
+
+    val extraArgs = args.drop(extraArgsStart)
+
+    // 默认 std-libs：jar 同目录
+    val defaultLibDir = Class.forName("nova.EntryKt").protectionDomain?.codeSource?.location
+        ?.let { java.io.File(it.toURI()).parentFile?.absolutePath } ?: "."
+
+    val libDir = stdLibsDir ?: defaultLibDir
+
+    runFile(file, extraArgs, libDir)
 }
 
-private fun runFile(path: String, extraArgs: List<String>) {
+private fun runFile(path: String, extraArgs: List<String>, libDir: String) {
     val p: Path = try {
         Path.of(path)
     } catch (e: InvalidPathException) {
@@ -45,7 +64,7 @@ private fun runFile(path: String, extraArgs: List<String>) {
             java.io.File(it.toURI()).parentFile?.absolutePath
         } ?: "."
 
-        Nova.run(source, extraArgs, p.toString(), jarDir)
+        Nova.run(source, extraArgs, p.toString(), jarDir, libDir)
     } catch (e: java.io.IOException) {
         System.err.println("Failed to read file: ${e.message}")
         exitProcess(1)

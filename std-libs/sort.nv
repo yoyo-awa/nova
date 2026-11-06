@@ -1,0 +1,160 @@
+module sort {
+    // ============================================================
+    // 快速排序（原地）
+    // ============================================================
+    func quickSort(arr) {
+        sortRange(arr, 0, Array.size(arr) - 1);
+        return arr;
+    }
+
+    func sortRange(arr, low, high) {
+        if (low >= high) { return; }
+        var pivot = arr[high];
+        var i = low - 1;
+        for item, idx = arr[$], high - low {
+            var j = low + idx;
+            if (arr[j] <= pivot) {
+                i = i + 1;
+                swap(arr, i, j);
+            }
+        }
+        swap(arr, i + 1, high);
+        var p = i + 1;
+        sortRange(arr, low, p - 1);
+        sortRange(arr, p + 1, high);
+    }
+
+    // ============================================================
+    // 归并排序（返回新数组）
+    // ============================================================
+    func mergeSort(arr) {
+        if (Array.size(arr) <= 1) {
+            return arr;
+        }
+        var mid = Array.size(arr) / 2;
+        var left = mergeSort(Array.slice(arr, 0, mid));
+        var right = mergeSort(Array.slice(arr, mid, Array.size(arr)));
+        return merge(left, right);
+    }
+
+    func merge(left, right) {
+        var result = [];
+        var i = 0;
+        var j = 0;
+        for item, idx = left[$], Array.size(left) {
+            if (j >= Array.size(right)) {
+                Array.push(result, item);
+            } else {
+                while (j < Array.size(right) && right[j] < item) {
+                    Array.push(result, right[j]);
+                    j = j + 1;
+                }
+                Array.push(result, item);
+            }
+        }
+        while (j < Array.size(right)) {
+            Array.push(result, right[j]);
+            j = j + 1;
+        }
+        return result;
+    }
+
+    // ============================================================
+    // 冒泡排序（原地）
+    // ============================================================
+    func bubbleSort(arr) {
+        var n = Array.size(arr);
+        for item, i = arr[$], n - 1 {
+            for x, j = arr[$], n - 1 - i {
+                if (arr[j] > arr[j + 1]) {
+                    swap(arr, j, j + 1);
+                }
+            }
+        }
+        return arr;
+    }
+
+    // ============================================================
+    // 插入排序（原地）
+    // ============================================================
+    func insertionSort(arr) {
+        var n = Array.size(arr);
+        for item, i = arr[$], n - 1 {
+            var key = arr[i + 1];
+            var j = i;
+            while (j >= 0 && arr[j] > key) {
+                arr[j + 1] = arr[j];
+                j = j - 1;
+            }
+            arr[j + 1] = key;
+        }
+        return arr;
+    }
+
+    // ============================================================
+    // 选择排序（原地）
+    // ============================================================
+    func selectionSort(arr) {
+        var n = Array.size(arr);
+        for item, i = arr[$], n - 1 {
+            var minIdx = i;
+            var j = i + 1;
+            for x, k = arr[$], n - 1 - i {
+                if (arr[j] < arr[minIdx]) {
+                    minIdx = j;
+                }
+                j = j + 1;
+            }
+            if (minIdx != i) {
+                swap(arr, i, minIdx);
+            }
+        }
+        return arr;
+    }
+
+    // ============================================================
+    // 检查是否已排序
+    // ============================================================
+    func isSorted(arr) {
+        for item, i = arr[$], Array.size(arr) - 1 {
+            if (arr[i] > arr[i + 1]) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // ============================================================
+    // 辅助：交换
+    // ============================================================
+    func swap(arr, i, j) {
+        var tmp = arr[i];
+        arr[i] = arr[j];
+        arr[j] = tmp;
+    }
+
+    /**
+     * 字符串排序：按每个字符串第一个字符的码点排序。
+     * 只支持单字符字符串。
+     */
+    func sortStrings(arr) {
+        // 转成码点
+        var codes = [];
+        for s, i = arr[$], Array.size(arr) {
+            if (String.size(s) != 1) {
+                throw "sort.sortStrings: expected single-character strings, got '" + s + "'";
+            }
+            Array.push(codes, String.getCharCode(s));
+        }
+
+        // 按码点排序（用现有的 quickSort，只支持数字）
+        quickSort(codes);
+
+        // 转回字符串
+        var result = [];
+        for c, i = codes[$], Array.size(codes) {
+            Array.push(result, String.fromCharCode(c));
+        }
+        return result;
+    }
+}

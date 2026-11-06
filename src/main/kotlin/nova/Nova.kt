@@ -8,10 +8,11 @@ object Nova {
         args: List<String> = emptyList(),
         fileName: String? = null,
         jarDir: String = ".",
+        libDir: String = ".",
     ): List<Stmt> {
         val tokens = Lexer(source).tokenize()
         val ast = Parser(tokens).parse()
-        Interpreter(args, fileName, jarDir).interpret(ast)
+        Interpreter(args, fileName, jarDir,libDir).interpret(ast)
         return ast
     }
 }

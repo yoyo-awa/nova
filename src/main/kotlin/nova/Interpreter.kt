@@ -21,7 +21,11 @@ class ReturnSignal(val value: Any?) : RuntimeException(null, null, false, false)
  *   - 执行 Stmt.NamespaceDecl：创建 NovaNamespace，把 body 定义到其中
  *   - 求值 Expr.MemberAccess / Expr.MemberSet
  */
-class Interpreter (private val args: List<String> = emptyList(), private val fileName: String? = null, private val jarDir: String = ".") {
+class Interpreter (
+    private val args: List<String> = emptyList(),
+    private val fileName: String? = null,
+    private val jarDir: String = ".",
+    private val libDir: String = "lib",) {
 
     private val globals = Environment()
 
@@ -43,6 +47,7 @@ class Interpreter (private val args: List<String> = emptyList(), private val fil
      */
     fun callFunction(fn: NovaFunction, args: List<Any?>): Any? {
         val fnEnv = Environment(fn.closure)
+        fnEnv.define("__fn__", fn)
         if (args.size != fn.params.size) {
             throw NovaRuntimeError("Expected ${fn.params.size} args, got ${args.size}")
         }
@@ -102,8 +107,7 @@ class Interpreter (private val args: List<String> = emptyList(), private val fil
 
                 if (env.getOrNull(moduleName) is NovaModule) return
 
-                val path = java.io.File(jarDir, "std-libs/" + stmt.parts.joinToString("/") + ".nv").absolutePath
-
+                val path = java.io.File(libDir, stmt.parts.joinToString("/") + ".nv").absolutePath
                 val file = java.io.File(path)
                 if (!file.exists()) {
                     throw NovaRuntimeError("Cannot find module '$fullName' at '$path'")

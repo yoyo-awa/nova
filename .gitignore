@@ -41,6 +41,6 @@ bin/
 ### Mac OS ###
 .DS_Store
 
-/example/
+/test/
 /build.bat
 /nova.bat

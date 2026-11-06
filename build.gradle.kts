@@ -1,3 +1,10 @@
+val versionFile = file("src/main/resources/version")
+
+
+if (versionFile.exists()) {
+    version = versionFile.readText().trim()
+}
+
 plugins {
     java
     kotlin("jvm") version "2.4.20"
@@ -6,7 +13,6 @@ plugins {
 }
 
 group = "nova"
-version = "1.0.0-alpha"
 
 repositories {
     // 阿里云镜像，同步 Maven Central 的内容，国内速度飞快
