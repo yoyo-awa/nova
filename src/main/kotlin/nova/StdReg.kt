@@ -48,6 +48,13 @@ object StdReg {
         globals.define("isnull", BuiltinFunction("isnull") { args ->
             args.getOrNull(0) == null
         })
+        globals.define("getannot", BuiltinFunction("getannot") { args ->
+            val fn = args.getOrNull(0) as? NovaFunction
+                ?: throw NovaRuntimeError("getannot: first argument must be a function")
+            val key = args.getOrNull(1)
+            val annot = fn.fields["__annot__"] as? NovaMap
+            annot?.get(key)
+        })
     }
 
     // ============================================================

@@ -24,13 +24,30 @@ class Parser(private val tokens: List<Token>) {
 
     /** 声明：var 变量 / func 函数 / namespace 命名空间 / 普通语句 */
     private fun declaration(): Stmt {
+        val annotations = parseAnnotations()
+        if (match(TokenType.FUNC)) return funcDeclaration(annotations)
         if (match(TokenType.CLASS))   return classDeclaration()
-        if (match(TokenType.FUNC))      return funcDeclaration()
         if (match(TokenType.VAR))       return varDeclaration()
         if (match(TokenType.CONST))     return constVarDeclaration()
         if (match(TokenType.NAMESPACE)) return namespaceDeclaration()
         if (match(TokenType.MODULE))    return moduleDeclaration()
         return statement()
+    }
+
+    private fun parseAnnotations(): List<Annotation> {
+        val annotations = mutableListOf<Annotation>()
+        while (match(TokenType.AT)) {
+            val name = consume(TokenType.IDENT, "Expect annotation name after '@'").lexeme
+            var value: String? = null
+            if (match(TokenType.LPAREN)) {
+                if (check(TokenType.STRING)) {
+                    value = consume(TokenType.STRING, "Expect annotation value").literal as String
+                }
+                consume(TokenType.RPAREN, "Expect ')' after annotation")
+            }
+            annotations.add(Annotation(name, value))
+        }
+        return annotations
     }
 
 
@@ -93,7 +110,7 @@ class Parser(private val tokens: List<Token>) {
     }
 
     /** func name(params) { body } */
-    private fun funcDeclaration(): Stmt {
+    private fun funcDeclaration(annotations: List<Annotation>): Stmt {
         val name = consume(TokenType.IDENT, "Expect function name").lexeme
         consume(TokenType.LPAREN, "Expect '(' after function name")
         val params = mutableListOf<String>()
@@ -104,7 +121,7 @@ class Parser(private val tokens: List<Token>) {
         }
         consume(TokenType.RPAREN, "Expect ')' after parameters")
         val body = block()
-        return Stmt.FuncDecl(name, params, body)
+        return Stmt.FuncDecl(name, params, body, annotations)
     }
 
     /** var name = init; */

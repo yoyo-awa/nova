@@ -277,13 +277,13 @@ class Interpreter (
             // func name(...) { ... }
             is Stmt.FuncDecl -> {
                 val fn = NovaFunction(stmt.params, stmt.body, env, stmt.name)
-                for (s in stmt.body) {
-                    if (s is Stmt.Property && !s.isRuntime) {
-                        fn.fields[s.name] = evaluate(s.initializer, env)
-                        if (s.isConst) fn.constFields.add(s.name)
+                if (stmt.annotations.isNotEmpty()) {
+                    val annotMap = NovaMap()
+                    for (ann in stmt.annotations) {
+                        annotMap[ann.name] = ann.value
                     }
+                    fn.fields["__annot__"] = annotMap
                 }
-
                 env.define(stmt.name, fn)
             }
 

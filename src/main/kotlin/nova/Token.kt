@@ -23,6 +23,7 @@ enum class TokenType {
     PLUS, MINUS, STAR, SLASH, PERCENT,
     EQ, NEQ, LT, GT, LTE, GTE, ASSIGN,
     DOT,
+    AT,
     SINGLE_ARROW, DOUBLE_ARROW,// .          成员访问（新增）
 
     // ---------- 分隔符 ----------

@@ -166,6 +166,7 @@ class Lexer(private val source: String) {
             '!' -> add(TokenType.NOT, "!")
             ':' -> add(TokenType.COLON, ":")
             '$' -> add(TokenType.DOLLAR, "$")
+            '@' -> add(TokenType.AT, "@")
             else -> throw NovaSyntaxError("Line $line: Unexpected character '$c'")
         }
     }

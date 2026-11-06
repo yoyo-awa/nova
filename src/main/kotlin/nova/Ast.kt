@@ -1,5 +1,9 @@
 package nova
 
+
+/** `@annot(value)` */
+data class Annotation(val name: String, val value: String?)
+
 /**
  * 表达式节点。
  * 变更点：
@@ -73,11 +77,13 @@ sealed class Stmt {
         val catchBlock: List<Stmt>
     ) : Stmt()
 
+
     /** func name(params) { ... } */
     data class FuncDecl(
         val name: String,
         val params: List<String>,
-        val body: List<Stmt>
+        val body: List<Stmt>,
+        val annotations: List<Annotation> = emptyList()
     ) : Stmt()
 
     /** namespace Name { ... } —— 新增 */
